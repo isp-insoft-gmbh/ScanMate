@@ -3,7 +3,7 @@
 ## Project stages
 
 1. Simple user identification + drink identification with minimum input and feedback
-2. Visal / Audio feedback
+2. User input via touch and visual feedback plus optional audio feedback
 3. Locking / Unlocking a fridge
 
 ## Hardware required
