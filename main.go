@@ -11,8 +11,8 @@ import (
 )
 
 func main() {
-	fmt.Println("START")
-	defer fmt.Println("END")
+	log.Println("START")
+	defer log.Println("END")
 	onExit := make(chan os.Signal)
 	go func() {
 		<-onExit
