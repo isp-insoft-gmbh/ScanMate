@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
@@ -71,5 +72,7 @@ func readBarcode() (string, error) {
 	if zBarError != nil {
 		return "", fmt.Errorf("error parsing image:%s", zBarError)
 	}
-	return barcodeBuffer.String(), nil
+
+	//zbar output contains trailing whitespace, therefore we always trim.
+	return strings.TrimSpace(barcodeBuffer.String()), nil
 }
