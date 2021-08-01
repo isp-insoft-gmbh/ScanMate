@@ -48,7 +48,7 @@ func main() {
 	}
 
 	//Visual indicator for being ready
-	blink(greenLEDPin, 100*time.Millisecond, 3)
+	blink(GREEN, 100*time.Millisecond, 3)
 	log.Println("READY - WAITING FOR USER INPUT")
 
 	for {
@@ -56,12 +56,12 @@ func main() {
 		case <-onExit:
 			{
 				//Visual indicator for shutdown
-				blink(redLEDPin, 100*time.Millisecond, 3)
+				blink(RED, 100*time.Millisecond, 3)
 
 				log.Println("Disabling LEDs")
 				//Make sure that on unexpected / expected shutdowns the LEDs are
 				//properly turned off.
-				disableLEDs()
+				setLEDColor(NONE)
 				log.Println("END")
 				os.Exit(0)
 			}
@@ -89,71 +89,141 @@ func logic() error {
 	//Values can be 0 and 1.
 	if buttonValue {
 		log.Println("BUTTON WAS PRESSED")
-		barcode, barcodeError := readBarcode()
-		if barcodeError == nil {
-			log.Println("The barcode is", barcode)
-		} else {
+		log.Println("Waiting for authentication barcode.")
+
+		blueLEDPin.Enable()
+		captureError := captureImage()
+		if captureError != nil {
 			//Valid case, as the picture can be blurry or there's no barcode present.
-			log.Println("Error reading barcode:", barcodeError)
+			log.Println("Error capturing barcode image:", captureError)
+			blueLEDPin.Disable()
+			redLEDPin.Enable()
+			return nil
 		}
+		blueLEDPin.Disable()
+
+		authBarcode, parseError := parseBarcodeImage()
+		if parseError != nil {
+			//Valid case, as the picture can be blurry or there's no barcode present.
+			log.Println("Error parsing barcode:", parseError)
+			redLEDPin.Enable()
+			return nil
+		}
+
+		blueLEDPin.Enable()
+		redLEDPin.Enable()
+
+		captureError = captureImage()
+		if captureError != nil {
+			//Valid case, as the picture can be blurry or there's no barcode present.
+			log.Println("Error capturing barcode image:", captureError)
+			blueLEDPin.Disable()
+			redLEDPin.Enable()
+			return nil
+		}
+
+		blueLEDPin.Disable()
+		blueLEDPin.Disable()
+
+		bottleBarcode, parseError := parseBarcodeImage()
+		if parseError != nil {
+			//Valid case, as the picture can be blurry or there's no barcode present.
+			log.Println("Error parsing barcode:", parseError)
+			redLEDPin.Enable()
+			return nil
+		}
+
+		log.Printf("Authbarcode: %s; Bottlebarcode: %s\n", authBarcode, bottleBarcode)
 	}
 
 	return nil
 }
 
-func disableLEDs() {
-	blueLEDPin.Disable()
-	redLEDPin.Disable()
-	greenLEDPin.Disable()
+type LEDColor int
+
+const (
+	NONE LEDColor = iota
+	RED
+	GREEN
+	BLUE
+	YELLOW
+	CYAN
+	MAGENTA
+	WHITE
+)
+
+func setLEDColor(color LEDColor) {
+	switch color {
+	case NONE:
+		redLEDPin.Disable()
+		greenLEDPin.Disable()
+		blueLEDPin.Disable()
+	case RED:
+		redLEDPin.Enable()
+		greenLEDPin.Disable()
+		blueLEDPin.Disable()
+	case GREEN:
+		redLEDPin.Disable()
+		greenLEDPin.Enable()
+		blueLEDPin.Disable()
+	case BLUE:
+		redLEDPin.Disable()
+		greenLEDPin.Disable()
+		blueLEDPin.Enable()
+	case YELLOW:
+		redLEDPin.Enable()
+		greenLEDPin.Enable()
+		blueLEDPin.Disable()
+	case CYAN:
+		redLEDPin.Disable()
+		greenLEDPin.Enable()
+		blueLEDPin.Enable()
+	case MAGENTA:
+		redLEDPin.Enable()
+		greenLEDPin.Disable()
+		blueLEDPin.Enable()
+	case WHITE:
+		redLEDPin.Enable()
+		greenLEDPin.Enable()
+		blueLEDPin.Enable()
+	}
 }
 
-func blink(led *gpio.OutputPin, interval time.Duration, count int) {
+func blink(led LEDColor, interval time.Duration, count int) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for i := 0; i < count; i++ {
 		<-ticker.C
-		led.Enable()
+		setLEDColor(led)
 		<-ticker.C
-		led.Disable()
+		setLEDColor(NONE)
 	}
 }
 
-// readBarcode takes an image via raspistill and tries parsing it with zbarimg.
-func readBarcode() (string, error) {
-	blueLEDPin.Enable()
+const imageTempPath = "/run/user/1000/barcode.jpg"
 
-	imageTempPath := "/run/user/1000/barcode.jpg"
-
-	raspistillCommand := exec.Command("raspistill", "--timeout", "1500", "--encoding", "jpg", "--output", imageTempPath, "--nopreview", "--quality", "10", "--rotation", "180")
+func captureImage() error {
+	raspistillCommand := exec.Command("raspistill", "--timeout", "1500", "--encoding", "jpg", "--output", imageTempPath, "--nopreview", "--quality", "10", "--rotation", "180", "--width", "1200", "--height", "1200")
 	log.Println("Executing:", raspistillCommand)
 	captureError := raspistillCommand.Run()
 	if captureError != nil {
-		return "", fmt.Errorf("error capturing image: %s", captureError)
+		return fmt.Errorf("error capturing image: %s", captureError)
 	}
 
-	blueLEDPin.Disable()
+	return nil
+}
 
-	zBarCommand := exec.Command("zbarimg", "-Sdisable", "-Sean13.enable", "--raw", "--quiet", imageTempPath)
+func parseBarcodeImage() (string, error) {
+	zBarCommand := exec.Command("zbarimg", "-Sdisable", "-Sean13.enable", "-Sposition=false", "-Sx-density=2", "-Sy-density=2", "--raw", "--quiet", imageTempPath)
 	log.Println("Executing:", zBarCommand)
 	var barcodeBuffer bytes.Buffer
 	zBarCommand.Stdout = &barcodeBuffer
 	zBarError := zBarCommand.Run()
 
-	//Disable both red and green, since we are too lazy to write two code pieces.
-	//FIXME This will cause unnecessary blocking, making the actual purchasing process slower.
-	//However, just making a background thread will cause multi threading problems.
-	defer func() {
-		<-time.NewTimer(3 * time.Second).C
-		greenLEDPin.Disable()
-		redLEDPin.Disable()
-	}()
-
 	if zBarError != nil {
-		redLEDPin.Enable()
 		return "", fmt.Errorf("error parsing image:%s", zBarError)
 	}
 
-	greenLEDPin.Enable()
 	//zbar output contains trailing whitespace, therefore we always trim.
 	return strings.TrimSpace(barcodeBuffer.String()), nil
 }
