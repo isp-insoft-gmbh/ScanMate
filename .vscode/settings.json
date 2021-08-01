@@ -1,0 +1,8 @@
+{
+    //Available modes:
+    //"" for production
+    //"dummy" for manual testing
+    //"test" for unit tests.
+    //See README.md for more detailed information.
+    "go.buildTags": "dummy",
+}

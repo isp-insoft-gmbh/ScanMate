@@ -39,6 +39,36 @@
   * Finish
 5. `sudo reboot` to make sure `raspi-config` properly applied everything
 
+## Testing in a development environment
+
+The codebase allows switching into different operation modes via build-tags.
+Those can be supplied by running the desired go command with the `-tags` flag.
+Possible values for tag are `dummy`, `test`.
+The `test` tag is required for unit tests, while the `dummy` tag is required
+for manual testing.
+
+Examples:
+
+```
+go run . # run normally on a raspberry pi
+go run -tags dummy .
+go test -tags test ./...
+```
+
+Attemping to run the unit-tests on the raspberry pi would require user
+interaction and is currently not supported.
+
+Running with `dummy` enabled will ask for user input, whenever the program
+would interact with any raspberry pi hardware, such as GPIO ports or a camera.
+During input querying, the application can't be killed via Ctrl-C. Instead
+Ctrl-D can be used. The SIGTERM and SIGINT signals will still be caught if
+sent any other way, as these work via process and not the terminal input.
+
+These values can also be set in VS Code, in order to let the go language server
+know which tags to use. Simply edit the `go.buildTags` value in
+`.vscode/settings.json`. These changes affect the compiler, the linter and
+other go tools, even documentation popups.
+
 ## User Stories
 
 ### Purchasing a drink
