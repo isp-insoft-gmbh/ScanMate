@@ -98,10 +98,8 @@ func setupGPIOPort(port uint64, direction string) error {
 	//required for accessing the port, but initally sets incorrect permissions.
 	//Here we are waiting until we are able to change the direction
 	//successfully. If we can't do this within 200ms, we stop.
-	tryTicker := time.NewTicker(20 * time.Millisecond)
-	defer tryTicker.Stop()
 	for i := 0; i < 10; i++ {
-		<-tryTicker.C
+		time.Sleep(20 * time.Millisecond)
 		gpioPortDirectionError = os.WriteFile(directionPath, []byte(direction), os.ModeAppend)
 		//Try until success
 		if gpioPortDirectionError == nil {
