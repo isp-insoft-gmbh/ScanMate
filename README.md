@@ -94,7 +94,26 @@ other go tools, even documentation popups.
 
 ## Stage one purchase workflow
 
-* Press Button to initiaze workflow
-* YELLOW LED lights up (READY state)
-* Camera starts taking pictures for USER_IDENT and DRINK_IDENT (in this order)
-* RED / GREEN LED lights up, depending on outcome (ERROR or SUCCESS)
+The idea with this workflow is to have different signals in different stages
+and allow the user to have some failures inbetween. This makes sure that
+user doesn't have to rerun stage one when failing stage two. This concept
+does not yet take acconut for any failures during server communication.
+
+0. Wait for button press
+1. Wait 2s
+2. Set LED BLUE for "waiting for identification barcode" indication
+3. Wait 1.5s
+4. Take picture
+5. Set LED NONE
+6. Parse image for barcode
+7. If fail { if failcount == 10 { GO TO 1. } else { BLINK RED 500ms; GO TO 2. } }
+8. Set LED MAGENTA for "waiting for drink barcode" indication
+9. Wait 1.5s
+10. Take picture
+11. Set LED NONE
+12. Parse image for barcode
+13. If fail { if failcount == 10 { GO TO 1. } else { BLINK RED 500ms; GO TO 8. } }
+14. Set LED GREEN
+15. Wait 3s
+16. Set LED NONE
+17. GO TO 0.
